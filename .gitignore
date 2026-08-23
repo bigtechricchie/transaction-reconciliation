@@ -1,0 +1,12 @@
+# Local environment files
+.env
+.env.*
+
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Build output
+bin/
+*.exe
