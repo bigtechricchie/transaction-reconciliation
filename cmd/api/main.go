@@ -49,15 +49,11 @@ func main() {
 		logger: logger,
 	}
 
-	serverMux := http.NewServeMux()
-
-	serverMux.HandleFunc("/v1/healthcheck", app.healthcheckHandler)
-
 	address := fmt.Sprintf(":%d", app.config.port)
 
 	server := &http.Server{
 		Addr:         address,
-		Handler:      serverMux,
+		Handler:      app.routes(),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -73,20 +69,4 @@ func main() {
 	if err != nil {
 		app.logger.Fatal(err)
 	}
-}
-
-func (app *application) healthcheckHandler(
-	writer http.ResponseWriter,
-	request *http.Request,
-) {
-	if request.Method != http.MethodGet {
-		http.Error(
-			writer,
-			http.StatusText(http.StatusMethodNotAllowed),
-			http.StatusMethodNotAllowed,
-		)
-		return
-	}
-
-	fmt.Fprintln(writer, "status: available")
 }
