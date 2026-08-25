@@ -10,5 +10,10 @@ func (app *application) routes() *http.ServeMux {
 		app.healthcheckHandler,
 	)
 
+	serverMux.HandleFunc(
+		"/v1/transactions",
+		app.transactionsHandler,
+	)
+
 	return serverMux
 }
