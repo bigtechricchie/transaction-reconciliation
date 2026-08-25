@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 	"transactionreconciliation/internal/data"
@@ -21,7 +19,30 @@ func (app *application) healthcheckHandler(
 		return
 	}
 
-	fmt.Fprintln(writer, "status: available")
+	data := envelope{
+		"status":      "available",
+		"environment": app.config.env,
+	}
+
+	err := app.writeJSON(
+		writer,
+		http.StatusOK,
+		data,
+		nil,
+	)
+	if err != nil {
+		app.logger.Printf(
+			"failed to write healthcheck response: %v",
+			err,
+		)
+
+		http.Error(
+			writer,
+			http.StatusText(http.StatusInternalServerError),
+			http.StatusInternalServerError,
+		)
+		return
+	}
 }
 
 func (app *application) transactionsHandler(
@@ -56,11 +77,17 @@ func (app *application) transactionsHandler(
 		},
 	}
 
-	writer.Header().Set("Content-Type", "application/json")
-
-	err := json.NewEncoder(writer).Encode(transactions)
+	err := app.writeJSON(
+		writer,
+		http.StatusOK,
+		envelope{"transactions": transactions},
+		nil,
+	)
 	if err != nil {
-		app.logger.Printf("failed to encode transactions response: %v", err)
+		app.logger.Printf(
+			"failed to write transactions response: %v",
+			err,
+		)
 
 		http.Error(
 			writer,
