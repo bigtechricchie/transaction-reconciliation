@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 		"log"
 	"net"
@@ -14,7 +15,7 @@ import (
 )
 
 type config struct {
-	serverHost          string
+	host                string
 	port                int
 	env                 string
 	databaseFilePath    string
@@ -27,15 +28,27 @@ type application struct {
 	transactionStore data.TransactionStore
 }
 
+const defaultHost = "127.0.0.1"
+
+func getEnvironmentHost() (string, error) {
+	host, configured := os.LookupEnv("HOST")
+	if !configured {
+		return defaultHost, nil
+	}
+
+	if strings.TrimSpace(host) == "" {
+		return "", errors.New("HOST must not be empty")
+	}
+
+	if strings.ContainsAny(host, " \t\r\n") {
+		return "", errors.New("HOST must not contain whitespace")
+	}
+
+	return host, nil
+}
+
 func main() {
 	var configuration config
-
-	flag.StringVar(
-		&configuration.serverHost,
-		"host",
-		"127.0.0.1",
-		"API server host",
-	)
 
 	flag.IntVar(
 		&configuration.port,
@@ -67,9 +80,11 @@ func main() {
 
 	flag.Parse()
 
-	if strings.TrimSpace(configuration.serverHost) == "" {
-		log.Fatal("API server host must not be empty")
+	host, err := getEnvironmentHost()
+	if err != nil {
+		log.Fatalf("failed to load API host configuration: %v", err)
 	}
+	configuration.host = host
 
 	logger := log.New(
 		os.Stdout,
@@ -95,7 +110,7 @@ func main() {
 	}
 
 	address := net.JoinHostPort(
-		app.config.serverHost,
+		app.config.host,
 		strconv.Itoa(app.config.port),
 	)
 
