@@ -2,16 +2,19 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"log"
+		"log"
+	"net"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"transactionreconciliation/internal/data"
 )
 
 type config struct {
+	serverHost          string
 	port                int
 	env                 string
 	databaseFilePath    string
@@ -26,6 +29,13 @@ type application struct {
 
 func main() {
 	var configuration config
+
+	flag.StringVar(
+		&configuration.serverHost,
+		"host",
+		"127.0.0.1",
+		"API server host",
+	)
 
 	flag.IntVar(
 		&configuration.port,
@@ -57,6 +67,10 @@ func main() {
 
 	flag.Parse()
 
+	if strings.TrimSpace(configuration.serverHost) == "" {
+		log.Fatal("API server host must not be empty")
+	}
+
 	logger := log.New(
 		os.Stdout,
 		"",
@@ -80,7 +94,10 @@ func main() {
 		transactionStore: transactionStore,
 	}
 
-	address := fmt.Sprintf(":%d", app.config.port)
+	address := net.JoinHostPort(
+		app.config.serverHost,
+		strconv.Itoa(app.config.port),
+	)
 
 	server := &http.Server{
 		Addr:              address,
