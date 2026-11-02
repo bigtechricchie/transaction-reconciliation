@@ -1,8 +1,12 @@
 package data
 
 import (
+	"context"
+	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -63,6 +67,76 @@ func OpenBboltTransactionStore(
 	return &BboltTransactionStore{database: database}, nil
 }
 
+func (transactionStore *BboltTransactionStore) Create(
+	ctx context.Context,
+	transaction *Transaction,
+) error {
+	if ctx == nil {
+		return errors.New("create transaction: context must not be nil")
+	}
+
+	if transaction == nil {
+		return errors.New("create transaction: transaction must not be nil")
+	}
+
+	if transaction.ID != 0 {
+		return errors.New("create transaction: transaction ID must be zero before creation")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("create transaction: %w", err)
+	}
+
+	var generatedTransactionID int64
+
+	err := transactionStore.database.Update(func(databaseTransaction *bolt.Tx) error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("create transaction: %w", err)
+		}
+
+		transactionsBucket := databaseTransaction.Bucket(
+			[]byte(transactionsBucketName),
+		)
+		if transactionsBucket == nil {
+			return errors.New("create transaction: transactions bucket is missing")
+		}
+
+		generatedSequence, err := transactionsBucket.NextSequence()
+		if err != nil {
+			return fmt.Errorf("create transaction ID: %w", err)
+		}
+
+		if generatedSequence == 0 || generatedSequence > math.MaxInt64 {
+			return errors.New("create transaction: generated transaction ID exceeds supported range")
+		}
+
+		generatedTransactionID = int64(generatedSequence)
+
+		storedTransaction := *transaction
+		storedTransaction.ID = generatedTransactionID
+
+		encodedTransaction, err := json.Marshal(storedTransaction)
+		if err != nil {
+			return fmt.Errorf("encode transaction for storage: %w", err)
+		}
+
+		transactionKey := makeTransactionKey(generatedTransactionID)
+
+		if err := transactionsBucket.Put(transactionKey, encodedTransaction); err != nil {
+			return fmt.Errorf("store transaction: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	transaction.ID = generatedTransactionID
+
+	return nil
+}
+
 func (transactionStore *BboltTransactionStore) Close() error {
 	if transactionStore == nil || transactionStore.database == nil {
 		return nil
@@ -73,4 +147,11 @@ func (transactionStore *BboltTransactionStore) Close() error {
 	}
 
 	return nil
+}
+
+func makeTransactionKey(transactionID int64) []byte {
+	transactionKey := make([]byte, 8)
+	binary.BigEndian.PutUint64(transactionKey, uint64(transactionID))
+
+	return transactionKey
 }
