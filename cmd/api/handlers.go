@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +37,79 @@ func (app *application) transactionsHandler(writer http.ResponseWriter, request 
 		app.createTransactionHandler(writer, request)
 	default:
 		http.Error(writer, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+}
+
+func (app *application) transactionByIDHandler(
+	writer http.ResponseWriter,
+	request *http.Request,
+) {
+	if request.Method != http.MethodGet {
+		http.Error(
+			writer,
+			http.StatusText(http.StatusMethodNotAllowed),
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	transactionIDValue := request.PathValue("transactionID")
+	transactionID, err := strconv.ParseInt(transactionIDValue, 10, 64)
+	if err != nil || transactionID <= 0 {
+		http.Error(
+			writer,
+			"transaction ID must be a positive integer",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	transaction, err := app.transactionStore.Get(
+		request.Context(),
+		transactionID,
+	)
+	if err != nil {
+		if errors.Is(err, data.ErrTransactionNotFound) {
+			http.Error(
+				writer,
+				http.StatusText(http.StatusNotFound),
+				http.StatusNotFound,
+			)
+			return
+		}
+
+		app.logger.Printf(
+			"failed to load transaction %d: %v",
+			transactionID,
+			err,
+		)
+
+		http.Error(
+			writer,
+			http.StatusText(http.StatusInternalServerError),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	err = app.writeJSON(
+		writer,
+		http.StatusOK,
+		envelope{"transaction": transaction},
+		nil,
+	)
+	if err != nil {
+		app.logger.Printf(
+			"failed to write transaction response: %v",
+			err,
+		)
+
+		http.Error(
+			writer,
+			http.StatusText(http.StatusInternalServerError),
+			http.StatusInternalServerError,
+		)
+		return
 	}
 }
 

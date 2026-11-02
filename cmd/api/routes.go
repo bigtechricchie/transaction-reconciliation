@@ -15,5 +15,10 @@ func (app *application) routes() *http.ServeMux {
 		app.transactionsHandler,
 	)
 
+	serverMux.HandleFunc(
+		"/v1/transactions/{transactionID}",
+		app.transactionByIDHandler,
+	)
+
 	return serverMux
 }
