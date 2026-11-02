@@ -15,6 +15,8 @@ import (
 
 const transactionsBucketName = "transactions"
 
+var ErrTransactionNotFound = errors.New("transaction not found")
+
 type BboltTransactionStore struct {
 	database *bolt.DB
 }
@@ -135,6 +137,56 @@ func (transactionStore *BboltTransactionStore) Create(
 	transaction.ID = generatedTransactionID
 
 	return nil
+}
+
+func (transactionStore *BboltTransactionStore) Get(
+	ctx context.Context,
+	transactionID int64,
+) (Transaction, error) {
+	if ctx == nil {
+		return Transaction{}, errors.New("get transaction: context must not be nil")
+	}
+
+	if transactionID <= 0 {
+		return Transaction{}, errors.New("get transaction: transaction ID must be greater than zero")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return Transaction{}, fmt.Errorf("get transaction: %w", err)
+	}
+
+	var transaction Transaction
+
+	err := transactionStore.database.View(func(databaseTransaction *bolt.Tx) error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("get transaction: %w", err)
+		}
+
+		transactionsBucket := databaseTransaction.Bucket(
+			[]byte(transactionsBucketName),
+		)
+		if transactionsBucket == nil {
+			return errors.New("get transaction: transactions bucket is missing")
+		}
+
+		encodedTransaction := transactionsBucket.Get(
+			makeTransactionKey(transactionID),
+		)
+		if encodedTransaction == nil {
+			return ErrTransactionNotFound
+		}
+
+		if err := json.Unmarshal(encodedTransaction, &transaction); err != nil {
+			return fmt.Errorf("decode stored transaction: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	return transaction, nil
 }
 
 func (transactionStore *BboltTransactionStore) Close() error {
