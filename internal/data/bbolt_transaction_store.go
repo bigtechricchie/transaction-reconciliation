@@ -70,10 +70,10 @@ func OpenBboltTransactionStore(
 }
 
 func (transactionStore *BboltTransactionStore) Create(
-	ctx context.Context,
+	requestContext context.Context,
 	transaction *Transaction,
 ) error {
-	if ctx == nil {
+	if requestContext == nil {
 		return errors.New("create transaction: context must not be nil")
 	}
 
@@ -85,14 +85,14 @@ func (transactionStore *BboltTransactionStore) Create(
 		return errors.New("create transaction: transaction ID must be zero before creation")
 	}
 
-	if err := ctx.Err(); err != nil {
+	if err := requestContext.Err(); err != nil {
 		return fmt.Errorf("create transaction: %w", err)
 	}
 
 	var generatedTransactionID int64
 
 	err := transactionStore.database.Update(func(databaseTransaction *bolt.Tx) error {
-		if err := ctx.Err(); err != nil {
+		if err := requestContext.Err(); err != nil {
 			return fmt.Errorf("create transaction: %w", err)
 		}
 
@@ -140,10 +140,10 @@ func (transactionStore *BboltTransactionStore) Create(
 }
 
 func (transactionStore *BboltTransactionStore) Get(
-	ctx context.Context,
+	requestContext context.Context,
 	transactionID int64,
 ) (Transaction, error) {
-	if ctx == nil {
+	if requestContext == nil {
 		return Transaction{}, errors.New("get transaction: context must not be nil")
 	}
 
@@ -151,14 +151,14 @@ func (transactionStore *BboltTransactionStore) Get(
 		return Transaction{}, errors.New("get transaction: transaction ID must be greater than zero")
 	}
 
-	if err := ctx.Err(); err != nil {
+	if err := requestContext.Err(); err != nil {
 		return Transaction{}, fmt.Errorf("get transaction: %w", err)
 	}
 
 	var transaction Transaction
 
 	err := transactionStore.database.View(func(databaseTransaction *bolt.Tx) error {
-		if err := ctx.Err(); err != nil {
+		if err := requestContext.Err(); err != nil {
 			return fmt.Errorf("get transaction: %w", err)
 		}
 
@@ -187,6 +187,53 @@ func (transactionStore *BboltTransactionStore) Get(
 	}
 
 	return transaction, nil
+}
+
+func (transactionStore *BboltTransactionStore) List(
+	requestContext context.Context,
+) ([]Transaction, error) {
+	if requestContext == nil {
+		return nil, errors.New("list transactions: context must not be nil")
+	}
+
+	if err := requestContext.Err(); err != nil {
+		return nil, fmt.Errorf("list transactions: %w", err)
+	}
+
+	transactions := make([]Transaction, 0)
+
+	err := transactionStore.database.View(func(databaseTransaction *bolt.Tx) error {
+		transactionsBucket := databaseTransaction.Bucket(
+			[]byte(transactionsBucketName),
+		)
+		if transactionsBucket == nil {
+			return errors.New("list transactions: transactions bucket is missing")
+		}
+
+		transactionCursor := transactionsBucket.Cursor()
+
+		for transactionKey, encodedTransaction := transactionCursor.First();
+			transactionKey != nil;
+			transactionKey, encodedTransaction = transactionCursor.Next() {
+			if err := requestContext.Err(); err != nil {
+				return fmt.Errorf("list transactions: %w", err)
+			}
+
+			var storedTransaction Transaction
+			if err := json.Unmarshal(encodedTransaction, &storedTransaction); err != nil {
+				return fmt.Errorf("decode stored transaction: %w", err)
+			}
+
+			transactions = append(transactions, storedTransaction)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return transactions, nil
 }
 
 func (transactionStore *BboltTransactionStore) Close() error {
