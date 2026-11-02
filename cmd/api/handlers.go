@@ -12,6 +12,7 @@ import (
 
 func (app *application) healthcheckHandler(writer http.ResponseWriter, request *http.Request) {
 	if request.Method != http.MethodGet {
+		writer.Header().Set("Allow", http.MethodGet)
 		http.Error(writer, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
@@ -36,6 +37,7 @@ func (app *application) transactionsHandler(writer http.ResponseWriter, request 
 	case http.MethodPost:
 		app.createTransactionHandler(writer, request)
 	default:
+		writer.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
 		http.Error(writer, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 }
@@ -63,6 +65,10 @@ func (app *application) transactionByIDHandler(
 	case http.MethodDelete:
 		app.deleteTransactionByIDHandler(writer, request, transactionID)
 	default:
+		writer.Header().Set(
+			"Allow",
+			http.MethodGet+", "+http.MethodPut+", "+http.MethodDelete,
+		)
 		http.Error(
 			writer,
 			http.StatusText(http.StatusMethodNotAllowed),
