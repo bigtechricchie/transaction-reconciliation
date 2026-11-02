@@ -83,11 +83,12 @@ func main() {
 	address := fmt.Sprintf(":%d", app.config.port)
 
 	server := &http.Server{
-		Addr:         address,
-		Handler:      app.routes(),
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:              address,
+		Handler:           app.routes(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	app.logger.Printf(
