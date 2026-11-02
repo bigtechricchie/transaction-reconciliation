@@ -146,6 +146,15 @@ func (app *application) updateTransactionByIDHandler(
 
 	err := app.readJSON(writer, request, &input)
 	if err != nil {
+		if errors.Is(err, errUnsupportedMediaType) {
+			http.Error(
+				writer,
+				http.StatusText(http.StatusUnsupportedMediaType),
+				http.StatusUnsupportedMediaType,
+			)
+			return
+		}
+
 		app.logger.Printf("failed to decode transaction update request: %v", err)
 		http.Error(writer, "invalid JSON request body", http.StatusBadRequest)
 		return
@@ -277,6 +286,15 @@ func (app *application) createTransactionHandler(writer http.ResponseWriter, req
 
 	err := app.readJSON(writer, request, &input)
 	if err != nil {
+		if errors.Is(err, errUnsupportedMediaType) {
+			http.Error(
+				writer,
+				http.StatusText(http.StatusUnsupportedMediaType),
+				http.StatusUnsupportedMediaType,
+			)
+			return
+		}
+
 		app.logger.Printf("failed to decode transaction request: %v", err)
 		http.Error(writer, "invalid JSON request body", http.StatusBadRequest)
 		return
