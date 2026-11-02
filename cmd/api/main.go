@@ -7,16 +7,21 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"transactionreconciliation/internal/data"
 )
 
 type config struct {
-	port int
-	env  string
+	port                int
+	env                 string
+	databaseFilePath    string
+	databaseLockTimeout time.Duration
 }
 
 type application struct {
-	config config
-	logger *log.Logger
+	config           config
+	logger           *log.Logger
+	transactionStore data.TransactionStore
 }
 
 func main() {
@@ -36,6 +41,20 @@ func main() {
 		"Application environment (development|staging|production)",
 	)
 
+	flag.StringVar(
+		&configuration.databaseFilePath,
+		"database-path",
+		"transactions.db",
+		"Path to the bbolt transaction database file",
+	)
+
+	flag.DurationVar(
+		&configuration.databaseLockTimeout,
+		"database-lock-timeout",
+		time.Second,
+		"Maximum time to wait for the bbolt database file lock",
+	)
+
 	flag.Parse()
 
 	logger := log.New(
@@ -44,9 +63,21 @@ func main() {
 		log.Ldate|log.Ltime,
 	)
 
+	transactionStore, err := data.OpenBboltTransactionStore(
+		configuration.databaseFilePath,
+		configuration.databaseLockTimeout,
+	)
+	if err != nil {
+		logger.Fatalf(
+			"failed to open transaction store: %v",
+			err,
+		)
+	}
+
 	app := &application{
-		config: configuration,
-		logger: logger,
+		config:           configuration,
+		logger:           logger,
+		transactionStore: transactionStore,
 	}
 
 	address := fmt.Sprintf(":%d", app.config.port)
@@ -65,8 +96,16 @@ func main() {
 		address,
 	)
 
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
+		closeErr := transactionStore.Close()
+		if closeErr != nil {
+			app.logger.Printf(
+				"failed to close transaction store: %v",
+				closeErr,
+			)
+		}
+
 		app.logger.Fatal(err)
 	}
 }
