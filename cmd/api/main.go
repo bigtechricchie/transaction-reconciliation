@@ -3,7 +3,8 @@ package main
 import (
 	"errors"
 	"flag"
-		"log"
+	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +13,11 @@ import (
 	"time"
 
 	"transactionreconciliation/internal/data"
+)
+
+const (
+	defaultHost = "127.0.0.1"
+	defaultPort = 4000
 )
 
 type config struct {
@@ -28,63 +34,11 @@ type application struct {
 	transactionStore data.TransactionStore
 }
 
-const defaultHost = "127.0.0.1"
-
-func getEnvironmentHost() (string, error) {
-	host, configured := os.LookupEnv("HOST")
-	if !configured {
-		return defaultHost, nil
-	}
-
-	if strings.TrimSpace(host) == "" {
-		return "", errors.New("HOST must not be empty")
-	}
-
-	if strings.ContainsAny(host, " \t\r\n") {
-		return "", errors.New("HOST must not contain whitespace")
-	}
-
-	return host, nil
-}
-
 func main() {
-	var configuration config
-
-	flag.IntVar(
-		&configuration.port,
-		"port",
-		4000,
-		"API server port",
-	)
-
-	flag.StringVar(
-		&configuration.env,
-		"env",
-		"development",
-		"Application environment (development|staging|production)",
-	)
-
-	flag.StringVar(
-		&configuration.databaseFilePath,
-		"database-path",
-		"transactions.db",
-		"Path to the bbolt transaction database file",
-	)
-
-	flag.DurationVar(
-		&configuration.databaseLockTimeout,
-		"database-lock-timeout",
-		time.Second,
-		"Maximum time to wait for the bbolt database file lock",
-	)
-
-	flag.Parse()
-
-	host, err := getEnvironmentHost()
+	configuration, err := loadConfig()
 	if err != nil {
-		log.Fatalf("failed to load API host configuration: %v", err)
+		log.Fatalf("failed to load API configuration: %v", err)
 	}
-	configuration.host = host
 
 	logger := log.New(
 		os.Stdout,
@@ -141,4 +95,91 @@ func main() {
 
 		app.logger.Fatal(err)
 	}
+}
+
+func loadConfig() (config, error) {
+	host, err := getEnvironmentHost()
+	if err != nil {
+		return config{}, err
+	}
+
+	port, err := getEnvironmentPort()
+	if err != nil {
+		return config{}, err
+	}
+
+	var configuration config
+
+	flag.StringVar(
+		&configuration.env,
+		"env",
+		"development",
+		"Application environment (development|staging|production)",
+	)
+
+	flag.StringVar(
+		&configuration.databaseFilePath,
+		"database-path",
+		"transactions.db",
+		"Path to the bbolt transaction database file",
+	)
+
+	flag.DurationVar(
+		&configuration.databaseLockTimeout,
+		"database-lock-timeout",
+		time.Second,
+		"Maximum time to wait for the bbolt database file lock",
+	)
+
+	flag.Parse()
+
+	configuration.host = host
+	configuration.port = port
+
+	return configuration, nil
+}
+
+func getEnvironmentHost() (string, error) {
+	host, configured := os.LookupEnv("HOST")
+	if !configured {
+		return defaultHost, nil
+	}
+
+	if strings.TrimSpace(host) == "" {
+		return "", errors.New("HOST must not be empty")
+	}
+
+	if strings.ContainsAny(host, " \t\r\n") {
+		return "", errors.New("HOST must not contain whitespace")
+	}
+
+	return host, nil
+}
+
+func getEnvironmentPort() (int, error) {
+	portValue, configured := os.LookupEnv("PORT")
+	if !configured {
+		return defaultPort, nil
+	}
+
+	if strings.TrimSpace(portValue) == "" {
+		return 0, errors.New("PORT must not be empty")
+	}
+
+	port, err := strconv.Atoi(portValue)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"PORT must be an integer: %w",
+			err,
+		)
+	}
+
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf(
+			"PORT must be between 1 and 65535, got %d",
+			port,
+		)
+	}
+
+	return port, nil
 }
