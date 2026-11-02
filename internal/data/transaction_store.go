@@ -10,9 +10,9 @@ import "context"
 // implementation can satisfy the same contract if the application's storage
 // requirements change.
 type TransactionStore interface {
-	Create(ctx context.Context, transaction *Transaction) error
-	Get(ctx context.Context, id int64) (Transaction, error)
-	List(ctx context.Context) ([]Transaction, error)
-	Update(ctx context.Context, transaction *Transaction) error
-	Delete(ctx context.Context, id int64) error
+	Create(requestContext context.Context, transaction *Transaction) error
+	Get(requestContext context.Context, transactionID int64) (Transaction, error)
+	List(requestContext context.Context) ([]Transaction, error)
+	Update(requestContext context.Context, transaction *Transaction) error
+	Delete(requestContext context.Context, transactionID int64) error
 }
