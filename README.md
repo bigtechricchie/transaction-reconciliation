@@ -13,10 +13,10 @@ The project focuses on:
 * RESTful API design using Go's `net/http`
 * transaction validation and financial business rules
 * exact monetary representation using integer minor units
-* SQLite persistence through `database/sql`
+* embedded ACID persistence using bbolt
 * deterministic reconciliation and exception classification
 * defensive handling of untrusted HTTP input
-* parameterised SQL and explicit error handling
+* explicit persistence boundaries and error handling
 * dependency and software supply-chain controls
 * server-rendered views using `html/template`
 * operational transaction tables with filtering, sorting, searching, and pagination
@@ -48,12 +48,14 @@ Go Web Application
    v
 Go REST API
    |
-   | database/sql
+   | storage abstraction
    v
-SQLite
+bbolt
 ```
 
 The API owns validation, reconciliation logic, and persistence. The web application consumes the API and presents operational data through server-rendered views.
+
+The persistence decision and its security, concurrency, and migration trade-offs are documented in [ADR-0001: Use bbolt for Embedded Transaction Persistence](docs/adr/0001-bbolt-persistence.md).
 
 ## Security Approach
 
@@ -63,10 +65,10 @@ Key principles include:
 
 * external input is treated as untrusted;
 * supported HTTP methods are explicitly constrained;
-* SQL statements use parameterised queries;
+* persistence access is isolated behind application-owned storage abstractions;
 * sensitive internal errors are not exposed directly to clients;
 * third-party dependencies require justification and review;
-* dependencies are vendored once introduced;
+* third-party modules are pinned, verified, and reviewed before adoption;
 * local database files and secrets are excluded from version control;
 * only synthetic financial data is used.
 
@@ -95,10 +97,11 @@ Current:
 Planned:
 
 * JSON
-* SQLite
-* `database/sql`
+* bbolt
+* application-owned storage abstractions
+* selective application-level encryption for sensitive fields where required
 * Go `html/template`
-* vendored third-party dependencies where required
+* vendored third-party dependencies where justified
 
 ## Local Development
 
