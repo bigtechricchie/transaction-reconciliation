@@ -291,6 +291,52 @@ func (transactionStore *BboltTransactionStore) Update(
 	return nil
 }
 
+func (transactionStore *BboltTransactionStore) Delete(
+	requestContext context.Context,
+	transactionID int64,
+) error {
+	if requestContext == nil {
+		return errors.New("delete transaction: context must not be nil")
+	}
+
+	if transactionID <= 0 {
+		return errors.New("delete transaction: transaction ID must be greater than zero")
+	}
+
+	if err := requestContext.Err(); err != nil {
+		return fmt.Errorf("delete transaction: %w", err)
+	}
+
+	err := transactionStore.database.Update(func(databaseTransaction *bolt.Tx) error {
+		if err := requestContext.Err(); err != nil {
+			return fmt.Errorf("delete transaction: %w", err)
+		}
+
+		transactionsBucket := databaseTransaction.Bucket(
+			[]byte(transactionsBucketName),
+		)
+		if transactionsBucket == nil {
+			return errors.New("delete transaction: transactions bucket is missing")
+		}
+
+		transactionKey := makeTransactionKey(transactionID)
+		if transactionsBucket.Get(transactionKey) == nil {
+			return ErrTransactionNotFound
+		}
+
+		if err := transactionsBucket.Delete(transactionKey); err != nil {
+			return fmt.Errorf("delete stored transaction: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (transactionStore *BboltTransactionStore) Close() error {
 	if transactionStore == nil || transactionStore.database == nil {
 		return nil
