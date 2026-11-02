@@ -236,6 +236,61 @@ func (transactionStore *BboltTransactionStore) List(
 	return transactions, nil
 }
 
+func (transactionStore *BboltTransactionStore) Update(
+	requestContext context.Context,
+	transaction *Transaction,
+) error {
+	if requestContext == nil {
+		return errors.New("update transaction: context must not be nil")
+	}
+
+	if transaction == nil {
+		return errors.New("update transaction: transaction must not be nil")
+	}
+
+	if transaction.ID <= 0 {
+		return errors.New("update transaction: transaction ID must be greater than zero")
+	}
+
+	if err := requestContext.Err(); err != nil {
+		return fmt.Errorf("update transaction: %w", err)
+	}
+
+	err := transactionStore.database.Update(func(databaseTransaction *bolt.Tx) error {
+		if err := requestContext.Err(); err != nil {
+			return fmt.Errorf("update transaction: %w", err)
+		}
+
+		transactionsBucket := databaseTransaction.Bucket(
+			[]byte(transactionsBucketName),
+		)
+		if transactionsBucket == nil {
+			return errors.New("update transaction: transactions bucket is missing")
+		}
+
+		transactionKey := makeTransactionKey(transaction.ID)
+		if transactionsBucket.Get(transactionKey) == nil {
+			return ErrTransactionNotFound
+		}
+
+		encodedTransaction, err := json.Marshal(transaction)
+		if err != nil {
+			return fmt.Errorf("encode transaction for storage: %w", err)
+		}
+
+		if err := transactionsBucket.Put(transactionKey, encodedTransaction); err != nil {
+			return fmt.Errorf("update stored transaction: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (transactionStore *BboltTransactionStore) Close() error {
 	if transactionStore == nil || transactionStore.database == nil {
 		return nil
