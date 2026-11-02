@@ -60,6 +60,8 @@ func (app *application) transactionByIDHandler(
 		app.getTransactionByIDHandler(writer, request, transactionID)
 	case http.MethodPut:
 		app.updateTransactionByIDHandler(writer, request, transactionID)
+	case http.MethodDelete:
+		app.deleteTransactionByIDHandler(writer, request, transactionID)
 	default:
 		http.Error(
 			writer,
@@ -206,6 +208,42 @@ func (app *application) updateTransactionByIDHandler(
 		app.logger.Printf("failed to write updated transaction response: %v", err)
 	}
 }
+func (app *application) deleteTransactionByIDHandler(
+	writer http.ResponseWriter,
+	request *http.Request,
+	transactionID int64,
+) {
+	err := app.transactionStore.Delete(
+		request.Context(),
+		transactionID,
+	)
+	if err != nil {
+		if errors.Is(err, data.ErrTransactionNotFound) {
+			http.Error(
+				writer,
+				http.StatusText(http.StatusNotFound),
+				http.StatusNotFound,
+			)
+			return
+		}
+
+		app.logger.Printf(
+			"failed to delete transaction %d: %v",
+			transactionID,
+			err,
+		)
+
+		http.Error(
+			writer,
+			http.StatusText(http.StatusInternalServerError),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	writer.WriteHeader(http.StatusNoContent)
+}
+
 func (app *application) listTransactionsHandler(writer http.ResponseWriter, request *http.Request) {
 	transactions, err := app.transactionStore.List(request.Context())
 	if err != nil {
