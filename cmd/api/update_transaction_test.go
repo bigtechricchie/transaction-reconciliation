@@ -101,6 +101,7 @@ func TestUpdateTransactionByIDReturnsNotFound(t *testing.T) {
 		"/v1/transactions/999",
 		strings.NewReader(requestBody),
 	)
+	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 
 	app.routes().ServeHTTP(recorder, request)
@@ -139,6 +140,7 @@ func TestUpdateTransactionByIDRejectsInvalidBody(t *testing.T) {
 		"/v1/transactions/1",
 		strings.NewReader(requestBody),
 	)
+	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 
 	app.routes().ServeHTTP(recorder, request)

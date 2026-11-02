@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 )
 
 type envelope map[string]any
+
+var errUnsupportedMediaType = errors.New("unsupported media type")
 
 func (app *application) writeJSON(
 	writer http.ResponseWriter,
@@ -45,6 +48,12 @@ func (app *application) readJSON(
 	request *http.Request,
 	destination any,
 ) error {
+	contentType := request.Header.Get("Content-Type")
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil || mediaType != "application/json" {
+		return errUnsupportedMediaType
+	}
+
 	// Bound request bodies so a small transaction payload cannot consume
 	// unbounded server memory or I/O resources.
 	const maxRequestBodyBytes = 1_048_576
@@ -59,7 +68,7 @@ func (app *application) readJSON(
 
 	decoder.DisallowUnknownFields()
 
-	err := decoder.Decode(destination)
+	err = decoder.Decode(destination)
 	if err != nil {
 		return err
 	}

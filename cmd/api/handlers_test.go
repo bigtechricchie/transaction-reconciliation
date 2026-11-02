@@ -194,6 +194,7 @@ func TestReadJSONRejectsOversizedRequest(t *testing.T) {
 	const maxRequestBodyBytes = 1_048_576
 	requestBody := "{\"reference\":\"" + strings.Repeat("a", maxRequestBodyBytes) + "\"}"
 	request := httptest.NewRequest(http.MethodPost, "/v1/transactions", strings.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	var destination struct {
 		Reference string `json:"reference"`
