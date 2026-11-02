@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 func TestOpenBboltTransactionStoreCreatesTransactionsBucket(t *testing.T) {
