@@ -1,17 +1,21 @@
 package main
 
 import (
+	"errors"
 	"flag"
-	"fmt"
-	"log"
+		"log"
+	"net"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"transactionreconciliation/internal/data"
 )
 
 type config struct {
+	host                string
 	port                int
 	env                 string
 	databaseFilePath    string
@@ -22,6 +26,25 @@ type application struct {
 	config           config
 	logger           *log.Logger
 	transactionStore data.TransactionStore
+}
+
+const defaultHost = "127.0.0.1"
+
+func getEnvironmentHost() (string, error) {
+	host, configured := os.LookupEnv("HOST")
+	if !configured {
+		return defaultHost, nil
+	}
+
+	if strings.TrimSpace(host) == "" {
+		return "", errors.New("HOST must not be empty")
+	}
+
+	if strings.ContainsAny(host, " \t\r\n") {
+		return "", errors.New("HOST must not contain whitespace")
+	}
+
+	return host, nil
 }
 
 func main() {
@@ -57,6 +80,12 @@ func main() {
 
 	flag.Parse()
 
+	host, err := getEnvironmentHost()
+	if err != nil {
+		log.Fatalf("failed to load API host configuration: %v", err)
+	}
+	configuration.host = host
+
 	logger := log.New(
 		os.Stdout,
 		"",
@@ -80,7 +109,10 @@ func main() {
 		transactionStore: transactionStore,
 	}
 
-	address := fmt.Sprintf(":%d", app.config.port)
+	address := net.JoinHostPort(
+		app.config.host,
+		strconv.Itoa(app.config.port),
+	)
 
 	server := &http.Server{
 		Addr:              address,
